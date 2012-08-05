@@ -69,7 +69,7 @@ def create_user(request):
             errors.append( {'id': 'answer', 'msg': 'Sorry, wrong answer' } )
         if not re.match(r'^[a-z0-9\-\{\}\.]+$', request.post['username'][0]):
             errors.append( {'id': 'username', 'msg': 'Username should match r\'^a-z0-9\-\{\}\.]+$\'' } )
-        if not re.match(r'^[a-z0-9\-\_]+\@[a-z0-9\-]+\.[a-z]{2,30}$', request.post['email'][0]):
+        if not re.match(r'^[a-z0-9\-\_\.]+\@[a-z0-9\-]+\.[a-z]{2,30}$', request.post['email'][0]):
             errors.append( {'id': 'email', 'msg': 'E-mail address incorrect.' } )
         if request.post['first'][0] == "":
             errors.append( {'id': 'first', 'msg': 'First name cannot be empty' } )
@@ -110,7 +110,7 @@ def create_user(request):
     # FIXME: ou should be configurable
     ldif = modlist.addModlist(attrs)
     try:
-        conn.add_s("uid=%s,ou=People,%s" % (escape_dn(request.post['username'][0].lower()), Config.ldap_base_dn), ldif)
+        conn.add_s("uid=%s,ou=accounts,%s" % (escape_dn(request.post['username'][0].lower()), Config.ldap_base_dn), ldif)
     except Exception as e:
         return request.response_json({'success': False,
                                       'errors': [{'id': 'username', 'msg': e.message['desc'] }]})
@@ -118,7 +118,7 @@ def create_user(request):
     #
     # Grab the entryUUID for the newly created object, this is the unique identifier for account email verification
     #
-    res = conn.search_s("uid=%s,ou=People,%s" % (escape_dn(request.post['username'][0].lower()), Config.ldap_base_dn), ldap.SCOPE_BASE, attrlist=[ 'entryUUID' ])
+    res = conn.search_s("uid=%s,ou=accounts,%s" % (escape_dn(request.post['username'][0].lower()), Config.ldap_base_dn), ldap.SCOPE_BASE, attrlist=[ 'entryUUID' ])
 
     if len(res) != 1:
         return request.response_json({'success': False, 
@@ -128,9 +128,9 @@ def create_user(request):
 
 
     # FIXME Text should be configurable
-    msg = MIMEText("Hello %(givenName)s,\n\nYou've created an account for %(site_name)s, but you still need to activate it. You can activate it by going to http://localhost/ldap-manager/verify.html?uuid=%(entryUUID)s&username=%(uid)s\n\nRegards,\n\nThe %(site_name)s team" % dict(attrs.items() + {'site_name': Config.site_name }.items()))
+    msg = MIMEText("Hello %(givenName)s,\n\nYou've created an account for %(site_name)s, but you still need to activate it. You can activate it by going to http://services.ifcat.org/registration/verify.html?uuid=%(entryUUID)s&username=%(uid)s\n\nOr enter the form fields manually:\nUUID: %(entryUUID)s\nUsername: %(uid)s\n\nRegards,\n\nThe %(site_name)s team" % dict(attrs.items() + {'site_name': Config.site_name }.items()))
     msg['Subject'] = 'Activate your account'
-    msg['From'] = "\"%(site_name)s\" <wilco@baanhofman.nl>" % dict(attrs.items() + {'site_name': Config.site_name }.items())
+    msg['From'] = "\"%(site_name)s\" <%(site_mail)s>" % dict(attrs.items() + {'site_name': Config.site_name, 'site_mail': Config.site_mail }.items())
     msg['To'] = attrs['mail']
 
     s = smtplib.SMTP('localhost')
